@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avalier-test3
+  labels:
+    app: avalier-test3
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  selector:
+    matchLabels:
+      app: avalier-test3
+  template:
+    metadata:
+      labels:
+        app: avalier-test3
+    spec:
+      containers:
+      - name: avalier-test3
+        image: avalier.azurecr.io/avalier-test3:master
+        ports:
+        - containerPort: 5000
+        - containerPort: 5001
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+        env:
+        - name: DOMAIN
+          value: "avalier-test3.beta.avalier.io"

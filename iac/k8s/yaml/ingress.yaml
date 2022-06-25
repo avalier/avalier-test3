@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: avalier-test3
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+spec:
+  tls:
+  - hosts:
+    - avalier-test3.beta.avalier.io
+    secretName: tls-avalier-test3-beta-avalier-io
+  rules:
+  - host: avalier-test3.beta.avalier.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: avalier-test3
+            port:
+              number: 80
+  

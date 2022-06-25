@@ -1,0 +1,129 @@
+name: Build
+on:
+  push:
+    #branches:
+    #  - master
+  pull_request:
+
+env:
+  ADVANCED_SECURITY: false
+  CONTAINER_NAME: avalier-test3
+  ACR_REGISTRY: avalier.azurecr.io
+
+jobs:
+
+  build_scan:
+    if: false
+    name: Build - Scan (using Github)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout code
+        if: ${{ env.ADVANCED_SECURITY == 'true' }}
+        uses: actions/checkout@v3
+
+      - name: Scan - Initialize
+        if: ${{ env.ADVANCED_SECURITY == 'true' }}
+        uses: github/codeql-action/init@v2
+        with:
+          languages: 'csharp'
+
+      - name: Scan - Autobuild
+        if: ${{ env.ADVANCED_SECURITY == 'true' }}
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Scan - Analyze
+        if: ${{ env.ADVANCED_SECURITY == 'true' }}
+        uses: github/codeql-action/analyze@v2
+
+  build_test:
+    name: Build - Test
+    runs-on: ubuntu-latest
+    env:
+      COVERAGE_THRESHOLD: 75
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore
+        run: |
+          dotnet restore ./src/Avalier.Test3.sln
+
+      - name: Build
+        run: |
+          dotnet build --no-restore ./src/Avalier.Test3.sln
+
+      - name: Test
+        run: |
+          dotnet test --no-build ./src/Avalier.Test3.sln /p:CollectCoverage=true /p:Threshold=$COVERAGE_THRESHOLD
+
+  package:
+    name: Package and Scan
+    needs: [ build_test ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build container image
+        run: |
+          docker build -t "${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:${{ github.sha }}" ./src
+          
+      - name: Scan using Aquasec Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:${{ github.sha }}'
+          format: 'sarif' 
+          output: 'trivy-results.sarif'
+
+        if: ${{ env.ADVANCED_SECURITY == 'true' }}
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - uses: gacts/github-slug@v1
+        id: slug
+
+      # Logs in with your Azure credentials
+      - name: Azure login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+      # Builds and pushes an image up to your Azure Container Registry
+      - name: Registry login
+        run: |
+          az acr login --name $ACR_REGISTRY
+
+      - name: Push image
+        run: |
+          export LABEL=${{ github.ref_name }}
+          if [ $LABEL == "main" ] || [ $LABEL == "master" ] ; then LABEL=latest ; fi
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:${{ github.sha }}
+          docker tag ${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:${{ github.sha }} ${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:$LABEL
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.CONTAINER_NAME }}:$LABEL
+
+  trigger_deploy_aks:
+    runs-on: ubuntu-latest
+    needs: [ package ]
+    steps:
+    - name: Execute
+      run: |
+        echo "Triggering deployment to aks"
+
+  trigger_deploy_aca:
+    runs-on: ubuntu-latest
+    needs: [ package ]
+    steps:
+    - name: Execute
+      run: |
+        echo "Triggering deployment to aca"

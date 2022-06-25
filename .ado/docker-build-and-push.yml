@@ -1,0 +1,14 @@
+
+parameters:
+  dockerRegistry: 'avalier.azurecr.io'
+  dockerTagName: ''
+  dockerImageName: 'avalier-test3'
+  helmVersion: 3.0.2
+
+steps:
+- script: |
+    docker build -t '$(dockerRegistry)/$(dockerImageName):latest' ./src
+  displayName: Docker - Build
+
+- script: |
+    #docker tag '$(dockerRegistry)/$(dockerImageName):latest' '$(dockerRegistry)/$(dockerImageName):$(Build.BuildNumber)'

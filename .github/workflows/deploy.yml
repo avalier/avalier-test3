@@ -1,0 +1,34 @@
+name: Deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+
+jobs:
+  Deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Parameters
+      run: |
+        echo "environment ${{ github.event.inputs.environment }}"
+        echo "ref: ${{ github.ref }}"
+        echo "ref_name: ${{ github.ref_name }}"
+        echo "ref_type: ${{ github.ref_type }}"
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Show target branch
+      run: |
+        echo "Working directory: $(pwd)"
+        .bin/execute.sh
+      
+        
+
+
+#https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch
